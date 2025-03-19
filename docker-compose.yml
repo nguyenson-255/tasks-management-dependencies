@@ -1,0 +1,34 @@
+name: 'to-do-app'
+
+services:
+  api:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - PORR=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres_app
+    volumes:
+      - ./app:/son/app
+      - /son/app/node_modules
+    ## Development 
+    command: ["npm", "run", "start:dev"]
+  postgres_app:
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=ns
+      - POSTGRES_HOST=postgres_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+volumes:
+  db_data:
+    
+  
+    
