@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    Injectable,
+    NotFoundException
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Task } from "../entities/task.entity";
 import { Repository } from "typeorm";
@@ -6,7 +10,6 @@ import { DependencyDto } from "../dto/dependency.dto";
 
 @Injectable()
 export class TaskDependencyService {
-
     constructor(
         @InjectRepository(Task)
         private taskReponsitory: Repository<Task>
@@ -14,48 +17,52 @@ export class TaskDependencyService {
 
     // dependencyTaskId <- dependentTaskId
     async addTaskDependency(dependencyDto: DependencyDto) {
+        const checkCircularDependencies = await this.validateCircularDependencies(dependencyDto);
 
-        const test = await this.validateCircularDependencies(dependencyDto)
-        console.log(test);
+        if (!checkCircularDependencies) {
+            const dependentTask = await this.taskReponsitory.findOne({
+                where: { id: dependencyDto.dependentTaskId },
+                relations: ["dependencies"],
+            });
+            const dependencyTask = await this.taskReponsitory.findOne({
+                where: { id: dependencyDto.dependencyTaskId },
+            });
 
-        const dependentTask = await this.taskReponsitory.findOne({
-            where: { id: dependencyDto.dependentTaskId },
-            relations: ['dependencies']
-        });
-        const dependencyTask = await this.taskReponsitory.findOne({
-            where: { id: dependencyDto.dependencyTaskId }
-        });
+            if (!dependentTask || !dependencyTask) {
+                throw new NotFoundException("Dependent/Dependency Task not found");
+            }
 
-        if (!dependentTask || !dependencyTask) {
-            throw new NotFoundException('Dependent/Dependency Task not found');
+            dependentTask.dependencies.push(dependencyTask);
+            await this.taskReponsitory.save(dependentTask);
+        } else {
+            throw new BadRequestException("Circular Dependencies are detected");
         }
-
-        dependentTask.dependencies.push(dependencyTask);
-
-        await this.taskReponsitory.save(dependentTask);
     }
 
     async removeTaskDependency(dependencyDto: DependencyDto) {
         const dependentTask = await this.taskReponsitory.findOne({
             where: { id: dependencyDto.dependentTaskId },
-            relations: ['dependencies']
+            relations: ["dependencies"],
         });
+
         if (!dependentTask) {
-            throw new NotFoundException('Dependent Task not found');
+            throw new NotFoundException("Dependent Task not found");
         }
-        dependentTask.dependencies = dependentTask.dependencies.filter(e => { e.id != dependencyDto.dependencyTaskId })
+
+        dependentTask.dependencies = dependentTask.dependencies.filter(
+            (e) => e.id !== dependencyDto.dependencyTaskId
+        );
         await this.taskReponsitory.save(dependentTask);
     }
 
     async getTaskDependencies(id: number): Promise<Task[]> {
-
         const task = await this.taskReponsitory.findOne({
-            where: { id: id },
-            relations: ['dependencies']
-        })
+            where: { id },
+            relations: ["dependencies"],
+        });
 
         if (!task) {
-            throw new NotFoundException('Task not found');
+            throw new NotFoundException("Task not found");
         }
 
         if (!task.dependencies || task.dependencies.length === 0) {
@@ -73,102 +80,87 @@ export class TaskDependencyService {
     }
 
     private async validateCircularDependencies(dependencyDto: DependencyDto) {
-        //23
-        const dependentTask = await this.taskReponsitory.findOne({
-            where: { id: dependencyDto.dependentTaskId },
-            relations: ['dependencies', 'dependents']
-        });
+        const graph = new Map<number, Set<number>>();
+        let visited = new Set<number>();
+        const stack = new Set<number>();
 
-        //22
         const dependencyTask = await this.taskReponsitory.findOne({
             where: { id: dependencyDto.dependencyTaskId },
-            relations: ['dependencies', 'dependents']
+            relations: ["dependencies", "dependents"],
         });
 
-        if (!dependentTask || !dependencyTask) {
-            throw new NotFoundException('Dependent/Dependency Task not found');
+        if (!dependencyTask) {
+            throw new NotFoundException("Dependency Task not found");
         }
 
-        // console.log('pre', dependentTask.dependencies);
+        this.addEdge(dependencyDto.dependentTaskId, dependencyDto.dependencyTaskId, graph);
+        await this.addEvery(dependencyTask, graph, visited);
 
-        dependencyTask.dependents.push(dependentTask);
+        visited = new Set<number>();
 
-        // console.log('pre1', dependentTask.dependencies);
-
-
-        // visited = 1 // in progress
-        // visited = 2 // done
-        // let visited = new Map<number, number>();
-        const graph = new Map<number, number[]>();
-        const visited = new Set<number>();
-        // Function to add an edge
-
-
-        this.addEdge(dependentTask.id,dependencyTask.id, graph);
-
-        console.log(dependencyTask.dependencies);
-        
-        if (await this.addEvery(dependencyTask, graph, visited)) {
-            return true; // 🔥 Cycle detected, stop!
+        // Run DFS for each node in the graph
+        for (const node of graph.keys()) {
+            if (!visited.has(node) && this.dfs(node, stack, visited, graph)) {
+                return true;
+            }
         }
-    
-        console.log(graph);
 
         return false;
-        // return await this.dfs(visited, dependencyTask)
     }
 
-    addEdge(from: number, to: number, graph: Map<number, number[]>) {
-        if (!graph.has(from)) graph.set(from, []);
-        graph.get(from)!.push(to);
+    addEdge(from: number, to: number, graph: Map<number, Set<number>>) {
+        if (!graph.has(from)) graph.set(from, new Set());
+        graph.get(from)!.add(to);
     }
 
-    // Function to recursively add all dependencies
-    async addEvery(dependencyTask: Task, graph: Map<number, number[]>, visited: Set<number>) {
+    async addEvery(dependencyTask: Task, graph: Map<number, Set<number>>, visited: Set<number>) {
         if (visited.has(dependencyTask.id)) {
-            console.log(`Cycle detected at node ${dependencyTask.id}`);
-            return true; // 🔥 Cycle detected!
+            return true;
         }
-    
-        visited.add(dependencyTask.id); // Mark as visited
+
+        visited.add(dependencyTask.id);
 
         for (const dep of dependencyTask.dependencies) {
             console.log(dep);
-            
+
             const temp = await this.taskReponsitory.findOne({
                 where: { id: dep.id },
-                relations: ['dependencies'],
+                relations: ["dependencies", "dependents"],
             });
-            if (temp) {
 
-                console.log(temp.dependencies);
-                
+            if (temp) {
                 this.addEdge(dependencyTask.id, dep.id, graph);
-                if (await this.addEvery(temp, graph, visited)) {
-                    return true;
-                }
+                await this.addEvery(temp, graph, visited);
             }
         }
 
-        visited.delete(dependencyTask.id);
-        return false;
+        for (const dep of dependencyTask.dependents) {
+            console.log(dep);
+
+            const temp = await this.taskReponsitory.findOne({
+                where: { id: dep.id },
+                relations: ["dependencies", "dependents"],
+            });
+
+            if (temp) {
+                this.addEdge(dep.id, dependencyTask.id, graph);
+                await this.addEvery(temp, graph, visited);
+            }
+        }
     }
 
-    private async dfs(visited: Map<number, number>, node: Task) {
+    dfs(node: number, stack: Set<number>, visited: Set<number>, graph: Map<number, Set<number>>): boolean {
+        if (stack.has(node)) return true;
+        if (visited.has(node)) return false;
 
-        if (visited.get(node.id) === 1) return true;
-        if (visited.get(node.id) === 2) return false;
+        visited.add(node);
+        stack.add(node);
 
-        for (let neighbor of node.dependencies || []) {
-            const temp = await this.taskReponsitory.findOne({
-                where: { id: neighbor.id },
-                relations: ['dependencies', 'dependents'],
-            })
-            if (temp) {
-                if (await this.dfs(visited, temp)) return true;
-            }
+        for (const neighbor of graph.get(node) ?? new Set()) {
+            if (this.dfs(neighbor, stack, visited, graph)) return true;
         }
-        visited.set(node.id, 2);
+
+        stack.delete(node);
         return false;
     }
 }
