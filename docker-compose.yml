@@ -5,9 +5,12 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
+      target: development
     restart: always
     environment:
-      - PORR=3000
+      - PORT=3000
+      - DATABASE_HOST=postgres_app
+      - DATABASE_PASSWORD=ns
     ports:
       - "3000:3000"
     depends_on:
@@ -15,14 +18,13 @@ services:
     volumes:
       - ./app:/son/app
       - /son/app/node_modules
-    ## Development 
+    ## Development
     command: ["npm", "run", "start:dev"]
   postgres_app:
     image: postgres:15
     restart: always
     environment:
       - POSTGRES_PASSWORD=ns
-      - POSTGRES_HOST=postgres_app
     ports:
       - "5432:5432"
     volumes:

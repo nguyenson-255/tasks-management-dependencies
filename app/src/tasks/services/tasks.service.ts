@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CreateTaskDto } from './dto/create-task.dto';
-import { UpdateTaskDto } from './dto/update-task.dto';
+import { CreateTaskDto } from '../dto/create-task.dto';
+import { UpdateTaskDto } from '../dto/update-task.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Task } from './entities/task.entity';
+import { Task } from '../entities/task.entity';
 import { Repository } from 'typeorm';
-import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
-import { StatusEnum } from './enum/status.enum';
+import { GetTasksFilterDto } from '../dto/get-tasks-filter.dto';
+import { StatusEnum } from '../enum/status.enum';
 
 type TaskResponse = Pick<Task, "id" | "title" | "description" | "dueDate" | "priority" | "status" | "dependencies" | "dependents">;
 
@@ -25,10 +25,10 @@ export class TasksService {
 
     const offset = (getTasksFilterDto.page - 1) * getTasksFilterDto.limit;
     const limit = getTasksFilterDto.limit;
-    const query = await this.taskReponsitory.createQueryBuilder('task');
+    const query = this.taskReponsitory.createQueryBuilder('task');
 
     console.log(offset, limit);
-    
+
 
     if (!!getTasksFilterDto.title) {
       query.andWhere('LOWER(task.title) LIKE LOWER(:title)', { title: `%${getTasksFilterDto.title}%` });
@@ -48,7 +48,7 @@ export class TasksService {
     }
 
     console.log(query.getSql());
-    
+
     const [data, total] = await query.leftJoinAndSelect('task.dependencies', 'dependencies').skip(offset).take(limit).getManyAndCount();
 
     return {
@@ -72,7 +72,7 @@ export class TasksService {
       if (await this.canStartTask(task)) {
         task.status = updateTaskDto.status;
       } else {
-        throw new BadRequestException('Can not update status this task');
+        throw new BadRequestException('This task cannot be updated until all its dependencies are completed.');
       }
     }
 
@@ -88,14 +88,14 @@ export class TasksService {
 
   async remove(id: number): Promise<TaskResponse> {
     const task = await this.taskReponsitory.findOne({
-      where: {id},
+      where: { id },
       relations: ['dependencies', 'dependents']
     });
 
     if (!task) {
       throw new NotFoundException('Task not found');
     }
-    
+
     // 17 <- 18 <- 19
     // 15 <- 18 <- 16
     task.dependents.forEach(async (element) => {
@@ -114,7 +114,7 @@ export class TasksService {
       if (hasInProgressDependency) {
         return false;
       }
-    } 
+    }
     return true;
   }
 }
