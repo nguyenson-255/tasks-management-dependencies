@@ -2,6 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TasksModule } from './tasks/tasks.module';
 import { ConfigModule } from '@nestjs/config';
+import { redisStore } from 'cache-manager-redis-store';
+import { CacheInterceptor, CacheModule } from '@nestjs/cache-manager';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -18,7 +22,20 @@ import { ConfigModule } from '@nestjs/config';
         synchronize: true,
       }),
     }),
+    CacheModule.register({
+      ttl: 10000,
+      store: redisStore,
+      host: process.env.REDIS_HOST,
+      port: 6379,
+    }),
+    ScheduleModule.forRoot(),
     TasksModule
   ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CacheInterceptor,
+    },
+  ]
 })
 export class AppModule {}

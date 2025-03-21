@@ -7,7 +7,7 @@ import { Repository } from 'typeorm';
 import { GetTasksFilterDto } from '../dto/get-tasks-filter.dto';
 import { StatusEnum } from '../enum/status.enum';
 
-type TaskResponse = Pick<Task, "id" | "title" | "description" | "dueDate" | "priority" | "status" | "dependencies" | "dependents">;
+export type TaskResponse = Pick<Task, "id" | "title" | "description" | "dueDate" | "priority" | "status" | "dependencies" | "dependents">;
 
 @Injectable()
 export class TasksService {
@@ -23,8 +23,16 @@ export class TasksService {
 
   async findAll(getTasksFilterDto: GetTasksFilterDto): Promise<any> {
 
-    const offset = (getTasksFilterDto.page - 1) * getTasksFilterDto.limit;
-    const limit = getTasksFilterDto.limit;
+    let offset: number = 0;
+    let limit: number | undefined = 0;
+    
+    if (getTasksFilterDto.page <= 0) {
+      limit = undefined;
+    } else {
+      offset = (getTasksFilterDto.page - 1) * getTasksFilterDto.limit;
+      limit = getTasksFilterDto.limit;
+    }
+   
     const query = this.taskReponsitory.createQueryBuilder('task');
 
     if (!!getTasksFilterDto.title) {
@@ -49,7 +57,7 @@ export class TasksService {
       data: { data },
       pagination: {
         total: total,
-        last_page: Math.ceil(total / limit),
+        last_page: !!limit ? Math.ceil(total / limit) : 1,
       }
     }
   }

@@ -15,7 +15,7 @@ export class TaskDependencyService {
     async addTaskDependency(dependencyDto: DependencyDto) {
         const checkCircularDependencies = await this.checkForCycles(dependencyDto);
         console.log(checkCircularDependencies);
-        
+
         if (!checkCircularDependencies) {
             const dependentTask = await this.taskReponsitory.findOne({
                 where: { id: dependencyDto.dependentTaskId },
@@ -73,10 +73,9 @@ export class TaskDependencyService {
             allDependencies.push(...subDependencies);
         }
 
+        // await this.sleep(100);
         // remove duplicate object
-        const uniqueTasks = Array.from(new Map(allDependencies.map(task => [task.id, task])).values());
-
-        return uniqueTasks;
+        return Array.from(new Map(allDependencies.map(task => [task.id, task])).values());
     }
 
     private async checkForCycles(dependencyDto: DependencyDto) {
@@ -98,7 +97,7 @@ export class TaskDependencyService {
         await this.loadTaskDependencies(dependencyTask, graph, visited);
 
         console.log(graph);
-        
+
         visited = new Set<number>();
 
         // Run detectCycleDFS for each node in the graph
