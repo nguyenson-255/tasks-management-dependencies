@@ -27,15 +27,11 @@ export class TasksService {
     const limit = getTasksFilterDto.limit;
     const query = this.taskReponsitory.createQueryBuilder('task');
 
-    console.log(offset, limit);
-
-
     if (!!getTasksFilterDto.title) {
       query.andWhere('LOWER(task.title) LIKE LOWER(:title)', { title: `%${getTasksFilterDto.title}%` });
     }
 
     if (!!getTasksFilterDto.description) {
-      console.log(`%${getTasksFilterDto.description}`);
       query.andWhere('task.description LIKE :description', { description: `${getTasksFilterDto.description}%` });
     }
 
@@ -47,14 +43,12 @@ export class TasksService {
       query.andWhere('task.priority = :priority', { priority: getTasksFilterDto.priority });
     }
 
-    console.log(query.getSql());
-
     const [data, total] = await query.leftJoinAndSelect('task.dependencies', 'dependencies').skip(offset).take(limit).getManyAndCount();
 
     return {
       data: { data },
       pagination: {
-        total_records: total,
+        total: total,
         last_page: Math.ceil(total / limit),
       }
     }

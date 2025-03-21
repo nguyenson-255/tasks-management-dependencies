@@ -122,7 +122,6 @@ export class TaskDependencyService {
         visited.add(dependencyTask.id);
 
         for (const dep of dependencyTask.dependencies) {
-            console.log(dep);
 
             const temp = await this.taskReponsitory.findOne({
                 where: { id: dep.id },
@@ -136,7 +135,6 @@ export class TaskDependencyService {
         }
 
         for (const dep of dependencyTask.dependents) {
-            console.log(dep);
 
             const temp = await this.taskReponsitory.findOne({
                 where: { id: dep.id },
