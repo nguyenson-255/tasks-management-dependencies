@@ -1,8 +1,4 @@
-import {
-    BadRequestException,
-    Injectable,
-    NotFoundException
-} from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Task } from "../entities/task.entity";
 import { Repository } from "typeorm";
@@ -18,7 +14,8 @@ export class TaskDependencyService {
     // dependencyTaskId <- dependentTaskId
     async addTaskDependency(dependencyDto: DependencyDto) {
         const checkCircularDependencies = await this.validateCircularDependencies(dependencyDto);
-
+        console.log(checkCircularDependencies);
+        
         if (!checkCircularDependencies) {
             const dependentTask = await this.taskReponsitory.findOne({
                 where: { id: dependencyDto.dependentTaskId },
@@ -80,9 +77,10 @@ export class TaskDependencyService {
     }
 
     private async validateCircularDependencies(dependencyDto: DependencyDto) {
-        const graph = new Map<number, Set<number>>();
+
+        let graph = new Map<number, Set<number>>();
         let visited = new Set<number>();
-        const stack = new Set<number>();
+        let stack = new Set<number>();
 
         const dependencyTask = await this.taskReponsitory.findOne({
             where: { id: dependencyDto.dependencyTaskId },
@@ -94,13 +92,15 @@ export class TaskDependencyService {
         }
 
         this.addEdge(dependencyDto.dependentTaskId, dependencyDto.dependencyTaskId, graph);
-        await this.addEvery(dependencyTask, graph, visited);
+        await this.loadTaskDependencies(dependencyTask, graph, visited);
 
+        console.log(graph);
+        
         visited = new Set<number>();
 
-        // Run DFS for each node in the graph
+        // Run detectCycleDFS for each node in the graph
         for (const node of graph.keys()) {
-            if (!visited.has(node) && this.dfs(node, stack, visited, graph)) {
+            if (!visited.has(node) && this.detectCycleDFS(node, stack, visited, graph)) {
                 return true;
             }
         }
@@ -108,12 +108,13 @@ export class TaskDependencyService {
         return false;
     }
 
-    addEdge(from: number, to: number, graph: Map<number, Set<number>>) {
+    // dependencyTaskId <- dependentTaskId
+    private addEdge(from: number, to: number, graph: Map<number, Set<number>>) {
         if (!graph.has(from)) graph.set(from, new Set());
         graph.get(from)!.add(to);
     }
 
-    async addEvery(dependencyTask: Task, graph: Map<number, Set<number>>, visited: Set<number>) {
+    private async loadTaskDependencies(dependencyTask: Task, graph: Map<number, Set<number>>, visited: Set<number>) {
         if (visited.has(dependencyTask.id)) {
             return true;
         }
@@ -130,7 +131,7 @@ export class TaskDependencyService {
 
             if (temp) {
                 this.addEdge(dependencyTask.id, dep.id, graph);
-                await this.addEvery(temp, graph, visited);
+                await this.loadTaskDependencies(temp, graph, visited);
             }
         }
 
@@ -144,12 +145,12 @@ export class TaskDependencyService {
 
             if (temp) {
                 this.addEdge(dep.id, dependencyTask.id, graph);
-                await this.addEvery(temp, graph, visited);
+                await this.loadTaskDependencies(temp, graph, visited);
             }
         }
     }
 
-    dfs(node: number, stack: Set<number>, visited: Set<number>, graph: Map<number, Set<number>>): boolean {
+    private detectCycleDFS(node: number, stack: Set<number>, visited: Set<number>, graph: Map<number, Set<number>>): boolean {
         if (stack.has(node)) return true;
         if (visited.has(node)) return false;
 
@@ -157,7 +158,7 @@ export class TaskDependencyService {
         stack.add(node);
 
         for (const neighbor of graph.get(node) ?? new Set()) {
-            if (this.dfs(neighbor, stack, visited, graph)) return true;
+            if (this.detectCycleDFS(neighbor, stack, visited, graph)) return true;
         }
 
         stack.delete(node);
