@@ -13,7 +13,7 @@ export class TaskDependencyService {
 
     // dependencyTaskId <- dependentTaskId
     async addTaskDependency(dependencyDto: DependencyDto) {
-        const checkCircularDependencies = await this.validateCircularDependencies(dependencyDto);
+        const checkCircularDependencies = await this.checkForCycles(dependencyDto);
         console.log(checkCircularDependencies);
         
         if (!checkCircularDependencies) {
@@ -76,7 +76,7 @@ export class TaskDependencyService {
         return allDependencies;
     }
 
-    private async validateCircularDependencies(dependencyDto: DependencyDto) {
+    private async checkForCycles(dependencyDto: DependencyDto) {
 
         let graph = new Map<number, Set<number>>();
         let visited = new Set<number>();
