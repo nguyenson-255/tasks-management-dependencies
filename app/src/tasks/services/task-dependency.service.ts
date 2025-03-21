@@ -73,7 +73,10 @@ export class TaskDependencyService {
             allDependencies.push(...subDependencies);
         }
 
-        return allDependencies;
+        // remove duplicate object
+        const uniqueTasks = Array.from(new Map(allDependencies.map(task => [task.id, task])).values());
+
+        return uniqueTasks;
     }
 
     private async checkForCycles(dependencyDto: DependencyDto) {
