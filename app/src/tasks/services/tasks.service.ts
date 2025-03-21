@@ -98,8 +98,6 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
 
-    // 17 <- 18 <- 19
-    // 15 <- 18 <- 16
     task.dependents.forEach(async (element) => {
 
       // remove dependency with task id 
