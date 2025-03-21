@@ -57,7 +57,7 @@ docker-compose down
 | DELETE | `/tasks/:id`                     | Delete a task                   | None                             |
 | GET    | `/tasks/addTaskDependency`       | Add dependencies between tasks           | `{ dependentTaskId: number, dependencyTaskId: number }` (query params) |
 | GET    | `/tasks/removeTaskDependency`    | Remove dependencies between tasks        | `{ dependentTaskId: number, dependencyTaskId: number }` (query params) |
-| GET    | `/tasks/getTaskDependencies/:id` | Get all dependencies of a task, including both direct dependencies (first level) and indirect dependencies (all subsequent levels).     | `id: number` (path param)       |
+| GET    | `/tasks/getTaskDependencies/:id` | Get all dependencies of a task, including both direct dependencies (first level) and indirect dependencies (all subsequent levels).     | none       |
 
 ### **Enum**
 
